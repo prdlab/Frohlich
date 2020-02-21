@@ -9,7 +9,7 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(tidyverse); library(rio); library(TSA)
+library(tidyverse); library(rio); library(TSA); library(janitor); library(broom); library(lmSupport)
 ```
 
 ```{r}
@@ -41,16 +41,16 @@ frohlich_data <- frohlich_data %>%
 ```{r}
 
 frohlich_data %>%
-  #filter(Session_Name_ == "claudia") %>%
+  filter(Session_Name_ == "claudia") %>%
 ggplot(aes(STARTING_ANGLE, illusion)) +
   geom_jitter() +
   geom_smooth(method = "loess") +
-  # facet_wrap(~entrainment_type) +
+  facet_wrap(~entrainment_type) +
   theme_minimal() +
   ylab("Illusion Effect (˚)") +
   xlab("Starting Angle of Motion (˚)")
-```
 
+```
 
 # Graph biases by duration
 
@@ -85,7 +85,7 @@ frohlich_data %>%
 ggplot(aes(probe_delay, illusion, group = as.factor(entrainment_type), color = as.factor(entrainment_type))) +
   geom_jitter() +
   geom_smooth(method = "loess") +
-  facet_wrap(~entrainment_type) +
+  facet_grid(entrainment_type ~ Session_Name_) +
   theme_minimal() +
   ylab("Illusion Effect (˚)") +
   xlab("Probe Delay (ms)")
