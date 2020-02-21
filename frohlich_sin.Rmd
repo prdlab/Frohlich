@@ -13,32 +13,107 @@ library(tidyverse); library(rio); library(TSA)
 ```
 
 ```{r}
-frohlich <- import("aztest.txt")
+pilot <- list.files("pilot")
+frohlich_data <- NULL
 
-frohlich <- frohlich %>%
-  filter(ABORT == FALSE) %>%
-  select(c(probe_delay, entrainment_type, STARTING_ANGLE, MOUSE_ANGLE)) %>%
+for (i in seq_along(pilot)) {
+  temp <- import(paste0("pilot/",pilot[i]))
+  frohlich_data <- rbind(frohlich_data, temp)
+}
+
+frohlich_data <- frohlich_data %>%
+  filter(Trial_Recycled_ == FALSE) %>%
+  select(c(Session_Name_, probe_delay, entrainment_type, DURATION, STARTING_ANGLE, MOUSE_ANGLE)) %>%
   mutate(probe_delay = probe_delay*16.6666)
 
-frohlich$MOUSE_ANGLE <- ifelse(frohlich$MOUSE_ANGLE > 0, frohlich$MOUSE_ANGLE, frohlich$MOUSE_ANGLE + 360)
+frohlich_data$MOUSE_ANGLE <- ifelse(frohlich_data$MOUSE_ANGLE > 0, frohlich_data$MOUSE_ANGLE, frohlich_data$MOUSE_ANGLE + 360)
 
-frohlich <- frohlich %>%
+frohlich_data <- frohlich_data %>%
   mutate(illusion = MOUSE_ANGLE - STARTING_ANGLE)
 
-frohlich <- frohlich %>%
+frohlich_data <- frohlich_data %>%
   filter(illusion > -50 & illusion < 50)
 
 ```
 
+# Graph biases by phase
+
 ```{r}
 
-ggplot(frohlich, aes(probe_delay, illusion, group = as.factor(entrainment_type), color = as.factor(entrainment_type))) +
+frohlich_data %>%
+  #filter(Session_Name_ == "claudia") %>%
+ggplot(aes(STARTING_ANGLE, illusion)) +
   geom_jitter() +
+  geom_smooth(method = "loess") +
+  # facet_wrap(~entrainment_type) +
+  theme_minimal() +
+  ylab("Illusion Effect (˚)") +
+  xlab("Starting Angle of Motion (˚)")
+```
+
+
+# Graph biases by duration
+
+```{r}
+
+frohlich_data %>%
+  #filter(Session_Name_ == "claudia") %>%
+ggplot(aes(DURATION, illusion)) +
+  geom_jitter() +
+  geom_smooth(method = "loess") +
+  # facet_wrap(~entrainment_type) +
+  theme_minimal() +
+  ylab("Illusion Effect (˚)") +
+  xlab("Duration (refreshes)")
+
+# Test duration as a significant predictor
+
+duration_model_0 <- lm(illusion ~ probe_delay,
+                       data = frohlich_data)
+duration_model_1 <- lm(illusion ~ probe_delay + DURATION,
+                       data = frohlich_data)
+
+summary(duration_model_0)
+summary(duration_model_1)
+```
+
+# Plot illusion data by probe delay
+
+```{r}
+frohlich_data %>%
+  #filter(Session_Name_ == "claudia") %>%
+ggplot(aes(probe_delay, illusion, group = as.factor(entrainment_type), color = as.factor(entrainment_type))) +
+  geom_jitter() +
+  geom_smooth(method = "loess") +
   facet_wrap(~entrainment_type) +
   theme_minimal() +
   ylab("Illusion Effect (˚)") +
   xlab("Probe Delay (ms)")
 
+```
+
+# Makin models - get Sara's help
+
+```{r}
+
+claudia_model <- frohlich_data %>%
+  filter(Session_Name_ == "claudia") %>%
+  lm(illusion ~ probe_delay + as.factor(entrainment_type) + STARTING_ANGLE,
+     data = .)
+
+scott_model <- frohlich_data %>%
+  filter(Session_Name_ == "scott") %>%
+  lm(illusion ~ probe_delay + as.factor(entrainment_type) + STARTING_ANGLE,
+     data = .)
+
+ernie_model <- frohlich_data %>%
+  filter(Session_Name_ == "ernie") %>%
+  lm(illusion ~ probe_delay + as.factor(entrainment_type) + STARTING_ANGLE,
+     data = .)
+
+summary(claudia_model)
+summary(scott_model)
+summary(ernie_model)
 
 ```
 
