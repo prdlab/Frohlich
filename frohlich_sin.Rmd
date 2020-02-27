@@ -9,7 +9,7 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(tidyverse); library(rio); library(TSA); library(janitor); library(broom); library(lmSupport)
+library(tidyverse); library(rio); library(TSA); library(janitor); library(broom); library(lmSupport); library(brms); library(reshape2)
 ```
 
 ```{r}
@@ -41,11 +41,11 @@ frohlich_data <- frohlich_data %>%
 ```{r}
 
 frohlich_data %>%
-  filter(Session_Name_ == "claudia") %>%
+  #filter(Session_Name_ == "scott") %>%
 ggplot(aes(STARTING_ANGLE, illusion)) +
   geom_jitter() +
-  geom_smooth(method = "loess") +
-  facet_wrap(~entrainment_type) +
+  geom_smooth(method = "loess", span = .25) +
+  facet_wrap(~Session_Name_) +
   theme_minimal() +
   ylab("Illusion Effect (˚)") +
   xlab("Starting Angle of Motion (˚)")
@@ -61,7 +61,7 @@ frohlich_data %>%
 ggplot(aes(DURATION, illusion)) +
   geom_jitter() +
   geom_smooth(method = "loess") +
-  # facet_wrap(~entrainment_type) +
+  facet_wrap(~Session_Name_) +
   theme_minimal() +
   ylab("Illusion Effect (˚)") +
   xlab("Duration (refreshes)")
@@ -115,7 +115,71 @@ summary(claudia_model)
 summary(scott_model)
 summary(ernie_model)
 
+
+
 ```
+
+# tryin stuff
+
+```{r}
+library(tidy)
+new_object <- frohlich_data %>%
+  group_by(Session_Name_) %>%
+  arrange(STARTING_ANGLE) %>%
+  nest() %>%
+  mutate(spec = map(data, function(x) spectrum(x[,"illusion"]))) %>%
+  mutate(per = map(spec, function(x) 1/x$freq[x$spec == max(x$spec)])) %>%
+  mutate(sine_model = map2(data, per, function(x,y) lm(illusion ~ sin(2*pi/y*STARTING_ANGLE) + cos(2*pi/y*STARTING_ANGLE), data = x))) %>%
+  mutate(predicted = map(sine_model, predict)) %>%
+  mutate(data = map2(data, predicted, cbind)) %>%
+  mutate(data = map(data, function(x) x %>%
+                      rename("predicted" = ".y[[1L]]"))) %>%
+  mutate(plot = map(data, function(x)
+    x %>% ggplot(aes(x = STARTING_ANGLE, y = illusion)) + 
+      geom_point() + geom_smooth(se=F) + geom_line(aes(y=predicted), color = "red")))
+
+augmented = new_object %>%
+  mutate(resid = map(sine_model, resid)) %>%
+  mutate(data = map2(data, resid, cbind)) %>%
+  select(Session_Name_, data) %>%
+  mutate(data = map(data, function(x) x %>%
+                      rename("residual" = ".y[[1L]]"))) %>%
+  unnest(cols = c(data))
+
+psych::describe(frohlich_data, fast = T)
+```
+
+
+
+
+
+# Loess fit of biases
+
+```{r}
+
+phase_bias <- predict(loess(STARTING_ANGLE ~ illusion,
+                      data = frohlich_data, span = .3),
+                      se = TRUE)
+
+span <- seq(0, 1, 0.05)
+residuals <- NULL
+
+for (i in seq_along(span)) {
+  temp_model <- predict(loess(STARTING_ANGLE ~ illusion,
+                      data = frohlich_data, span = i),
+                      se = TRUE)
+  residuals[i] <- temp_model$residual.scale
+}
+
+melt(span, residuals)
+
+
+```
+
+
+
+
+
 
 
 
